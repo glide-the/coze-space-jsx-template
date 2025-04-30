@@ -21,15 +21,15 @@ const QuestionGenerator = () => {
   const [model, setModel] = useState('DeepseekR1');
   const [questionTypes, setQuestionTypes] = useState<QuestionTypes>({
     '基础知识': ['概念理解'],
-    '智力技能': ['数值计算'],
-    '认知策略': ['COT'],
-    '动作技能': ['RAG'],
-    '情感感知': ['情绪']
+    '智力技能': [],
+    '认知策略': [],
+    '动作技能': [],
+    '情感感知': []
   });
   const [nodeCount, setNodeCount] = useState(1);
-  const [hasAttachment, setHasAttachment] = useState(false);
   const [questionCount, setQuestionCount] = useState(5);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [requiredFile, setRequiredFile] = useState<File | null>(null);
+  const [optionalFile, setOptionalFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedData, setGeneratedData] = useState<GeneratedData[]>([]);
   const [expandedCategories, setExpandedCategories] = useState({
@@ -71,26 +71,33 @@ const QuestionGenerator = () => {
 
   const toggleQuestionType = (category: QuestionCategory, type: string) => {
     setQuestionTypes(prev => {
-      const currentTypes = [...prev[category]];
-      const index = currentTypes.indexOf(type);
+      // Create a new state with all categories empty
+      const newState: QuestionTypes = {
+        '基础知识': [],
+        '智力技能': [],
+        '认知策略': [],
+        '动作技能': [],
+        '情感感知': []
+      };
       
-      if (index === -1) {
-        // 选中新选项时，只更新当前分类，保持其他分类不变
-        return {
-          ...prev,
-          [category]: [type]
-        };
-      } else {
-        // 点击已选中的选项时，保持选中状态
-        return prev;
-      }
+      // Set only the selected type in the selected category
+      newState[category] = [type];
+      
+      return newState;
     });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRequiredFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e?.target?.files?.[0];
     if (file) {
-      setPdfFile(file);
+      setRequiredFile(file);
+    }
+  };
+
+  const handleOptionalFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e?.target?.files?.[0];
+    if (file) {
+      setOptionalFile(file);
     }
   };
 
@@ -107,17 +114,20 @@ const QuestionGenerator = () => {
       model,
       questionTypes,
       nodeCount,
-      hasAttachment,
       questionCount,
-      pdfFile: pdfFile ? pdfFile.name : null
+      requiredFile: requiredFile ? requiredFile.name : null,
+      optionalFile: optionalFile ? optionalFile.name : null
     });
 
     setIsGenerating(true);
     
     try {
       const formData = new FormData();
-      if (pdfFile) {
-        formData.append('file', pdfFile);
+      if (requiredFile) {
+        formData.append('file', requiredFile);
+      }
+      if (optionalFile) {
+        formData.append('optionalFile', optionalFile);
       }
       
       // 添加其他数据
@@ -125,7 +135,6 @@ const QuestionGenerator = () => {
         model,
         questionTypes,
         nodeCount,
-        hasAttachment,
         questionCount,
         selectedCategory,
         selectedType: questionTypes[selectedCategory]?.[0] || '概念理解'
@@ -267,9 +276,11 @@ const QuestionGenerator = () => {
                           className={`flex items-center p-2 rounded-md text-sm ${questionTypes[category as QuestionCategory]?.includes(type) ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-700'}`}
                         >
                           {questionTypes[category as QuestionCategory]?.includes(type) ? (
-                            <Check className="mr-2" size={14} />
+                            <div className="w-4 h-4 border-2 border-blue-500 rounded-full mr-2 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            </div>
                           ) : (
-                            <div className="w-4 h-4 border border-gray-300 rounded mr-2"></div>
+                            <div className="w-4 h-4 border-2 border-gray-300 rounded-full mr-2"></div>
                           )}
                           {type}
                         </button>
@@ -299,60 +310,64 @@ const QuestionGenerator = () => {
               </div>
             </div>
 
-            {/* 是否需要附件 */}
+            {/* 必需文件上传 */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center">
+                <FileUp className="mr-2 text-blue-500" size={18} />
+                必需PDF附件上传
+              </h2>
+              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                <div className="flex flex-col items-center justify-center pt-4 pb-5">
+                  <FileInput className="mb-1 text-gray-500" size={20} />
+                  <p className="mb-1 text-sm text-gray-500">
+                    <span className="font-semibold">点击上传</span> 或拖拽文件
+                  </p>
+                  <p className="text-xs text-gray-500">PDF文件 (最大10MB)</p>
+                </div>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf" 
+                  onChange={handleRequiredFileChange}
+                  required
+                />
+              </label>
+              {requiredFile && (
+                <div className="mt-2 flex items-center text-sm text-gray-600">
+                  <File className="mr-2" size={14} />
+                  {requiredFile.name}
+                </div>
+              )}
+            </div>
+
+            {/* 可选文件上传 */}
             <div className="mb-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center">
                 <FileImage className="mr-2 text-blue-500" size={18} />
-                是否需要附件
+                可选PDF附件上传
               </h2>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setHasAttachment(true)}
-                  className={`px-4 py-2 rounded-md flex-1 flex items-center justify-center ${hasAttachment ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
-                >
-                  <Check className="mr-2" size={16} />
-                  是
-                </button>
-                <button
-                  onClick={() => setHasAttachment(false)}
-                  className={`px-4 py-2 rounded-md flex-1 flex items-center justify-center ${!hasAttachment ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
-                >
-                  <X className="mr-2" size={16} />
-                  否
-                </button>
-              </div>
+              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                <div className="flex flex-col items-center justify-center pt-4 pb-5">
+                  <FileInput className="mb-1 text-gray-500" size={20} />
+                  <p className="mb-1 text-sm text-gray-500">
+                    <span className="font-semibold">点击上传</span> 或拖拽文件
+                  </p>
+                  <p className="text-xs text-gray-500">PDF文件 (最大10MB)</p>
+                </div>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf" 
+                  onChange={handleOptionalFileChange}
+                />
+              </label>
+              {optionalFile && (
+                <div className="mt-2 flex items-center text-sm text-gray-600">
+                  <File className="mr-2" size={14} />
+                  {optionalFile.name}
+                </div>
+              )}
             </div>
-
-            {/* 附件上传 */}
-            {hasAttachment && (
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-4 flex items-center">
-                  <FileUp className="mr-2 text-blue-500" size={18} />
-                  PDF附件上传
-                </h2>
-                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                  <div className="flex flex-col items-center justify-center pt-4 pb-5">
-                    <FileInput className="mb-1 text-gray-500" size={20} />
-                    <p className="mb-1 text-sm text-gray-500">
-                      <span className="font-semibold">点击上传</span> 或拖拽文件
-                    </p>
-                    <p className="text-xs text-gray-500">PDF文件 (最大10MB)</p>
-                  </div>
-                  <input 
-                    type="file" 
-                    className="hidden" 
-                    accept=".pdf" 
-                    onChange={handleFileChange}
-                  />
-                </label>
-                {pdfFile && (
-                  <div className="mt-2 flex items-center text-sm text-gray-600">
-                    <File className="mr-2" size={14} />
-                    {pdfFile.name}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* 生成题目数量 */}
             <div className="mb-6">
@@ -380,8 +395,8 @@ const QuestionGenerator = () => {
             {/* 生成按钮 */}
             <button
               onClick={generateQuestions}
-              disabled={isGenerating || Object.values(questionTypes).every(types => types?.length === 0)}
-              className={`w-full py-3 rounded-lg flex items-center justify-center mt-4 ${isGenerating || Object.values(questionTypes).every(types => types?.length === 0) ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+              disabled={isGenerating || Object.values(questionTypes).every(types => types?.length === 0) || !requiredFile}
+              className={`w-full py-3 rounded-lg flex items-center justify-center mt-4 ${isGenerating || Object.values(questionTypes).every(types => types?.length === 0) || !requiredFile ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
             >
               {isGenerating ? (
                 <div className="flex items-center">
