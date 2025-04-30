@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, FileText, FileInput, FileOutput, FileCheck, FileSearch, FilePlus, FileMinus, FileX, File, FileDigit, FileClock, FileSpreadsheet, FileBarChart2, FileCode2, FileImage, FileAudio2, FileVideo2, FileArchive, FileSignature, FileDiff, FileHeart, FileJson, FileKey2, FileLock2, FilePieChart, FileScan, FileSearch2, FileStack, FileTerminal, FileType2, FileUp, FileVolume2, FileWarning, FileZip, ChevronDown, ChevronRight, Check, X, Plus, Minus, BookOpen, Brain, Cpu, Activity, Heart, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
+import * as XLSX from 'xlsx';
 
 type QuestionCategory = '基础知识' | '智力技能' | '认知策略' | '动作技能' | '情感感知';
 type QuestionTypes = {
@@ -93,7 +94,7 @@ const QuestionGenerator = () => {
     }
   };
 
-  const generateQuestions = () => {
+  const generateQuestions = async () => {
     // 验证所有必填内容
     const selectedCategory = Object.keys(questionTypes).find(cat => questionTypes[cat as QuestionCategory]?.length > 0) as QuestionCategory | undefined;
     if (!selectedCategory) {
@@ -113,29 +114,74 @@ const QuestionGenerator = () => {
 
     setIsGenerating(true);
     
-    // 模拟生成过程
-    setTimeout(() => {
-      const data = [];
-      const selectedType = questionTypes[selectedCategory]?.[0] || '概念理解';
+    try {
+      const formData = new FormData();
+      if (pdfFile) {
+        formData.append('file', pdfFile);
+      }
       
-      for (let i = 0; i < questionCount; i++) {
-        data.push({
+      // 添加其他数据
+      const jsonData = {
+        model,
+        questionTypes,
+        nodeCount,
+        hasAttachment,
+        questionCount,
+        selectedCategory,
+        selectedType: questionTypes[selectedCategory]?.[0] || '概念理解'
+      };
+      formData.append('json', JSON.stringify(jsonData));
+
+      const response = await fetch('http://localhost:8000/extract_standard_file', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      
+      if (result.code === 0) {
+        // 处理成功响应
+        const data = result.data.map((item: any, i: number) => ({
           id: `T${(i + 1).toString().padStart(3, '0')}`,
-          type: selectedType,
+          type: questionTypes[selectedCategory]?.[0] || '概念理解',
           category: selectedCategory,
           model,
           nodes: nodeCount,
-          attachment: hasAttachment ? '有' : '无'
-        });
+          attachment: JSON.stringify(item)
+        }));
+        setGeneratedData(data);
+      } else {
+        console.error('API请求失败:', result.msg);
       }
-      setGeneratedData(data);
+    } catch (error) {
+      console.error('请求出错:', error);
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   const downloadExcel = () => {
-    //  
+    if (generatedData.length === 0) return;
 
+    // Convert data to worksheet format
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['题目ID', '分类', '类型', '模型', '节点', '附件'], // Headers
+      ...generatedData.map(row => [
+        row.id,
+        row.category,
+        row.type,
+        row.model,
+        row.nodes,
+        row.attachment
+      ])
+    ]);
+
+    // Create workbook and append the worksheet
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '题目数据');
+
+    // Generate Excel file
+    XLSX.writeFile(workbook, `题目数据_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (
