@@ -2,21 +2,35 @@ import React, { useState } from 'react';
 import { Download, FileText, FileInput, FileOutput, FileCheck, FileSearch, FilePlus, FileMinus, FileX, File, FileDigit, FileClock, FileSpreadsheet, FileBarChart2, FileCode2, FileImage, FileAudio2, FileVideo2, FileArchive, FileSignature, FileDiff, FileHeart, FileJson, FileKey2, FileLock2, FilePieChart, FileScan, FileSearch2, FileStack, FileTerminal, FileType2, FileUp, FileVolume2, FileWarning, FileZip, ChevronDown, ChevronRight, Check, X, Plus, Minus, BookOpen, Brain, Cpu, Activity, Heart, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+type QuestionCategory = '基础知识' | '智力技能' | '认知策略' | '动作技能' | '情感感知';
+type QuestionTypes = {
+  [K in QuestionCategory]: string[];
+};
+
+type GeneratedData = {
+  id: string;
+  type: string;
+  category: QuestionCategory;
+  model: string;
+  nodes: number;
+  attachment: string;
+};
+
 const QuestionGenerator = () => {
   const [model, setModel] = useState('DeepseekR1');
-  const [questionTypes, setQuestionTypes] = useState({
-    '基础知识': [],
-    '智力技能': [],
-    '认知策略': [],
-    '动作技能': [],
-    '情感感知': []
+  const [questionTypes, setQuestionTypes] = useState<QuestionTypes>({
+    '基础知识': ['概念理解'],
+    '智力技能': ['数值计算'],
+    '认知策略': ['COT'],
+    '动作技能': ['RAG'],
+    '情感感知': ['情绪']
   });
   const [nodeCount, setNodeCount] = useState(1);
   const [hasAttachment, setHasAttachment] = useState(false);
   const [questionCount, setQuestionCount] = useState(5);
-  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedData, setGeneratedData] = useState([]);
+  const [generatedData, setGeneratedData] = useState<GeneratedData[]>([]);
   const [expandedCategories, setExpandedCategories] = useState({
     '基础知识': true,
     '智力技能': false,
@@ -25,14 +39,36 @@ const QuestionGenerator = () => {
     '情感感知': false
   });
 
-  const toggleCategory = (category) => {
+  interface FormData {
+    name: string;
+    email: string;
+    message: string;
+  }
+
+  const [formData, setFormData] = useState<FormData>({ name: '', email: '', message: '' });
+  const [submittedData, setSubmittedData] = useState<FormData | null>(null);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmittedData(formData);
+  };
+
+  const toggleCategory = (category: QuestionCategory) => {
     setExpandedCategories(prev => ({
       ...prev,
       [category]: !prev[category]
     }));
   };
 
-  const toggleQuestionType = (category, type) => {
+  const toggleQuestionType = (category: QuestionCategory, type: string) => {
     setQuestionTypes(prev => {
       const currentTypes = [...prev[category]];
       const index = currentTypes.indexOf(type);
@@ -50,7 +86,7 @@ const QuestionGenerator = () => {
     });
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e?.target?.files?.[0];
     if (file) {
       setPdfFile(file);
@@ -58,19 +94,35 @@ const QuestionGenerator = () => {
   };
 
   const generateQuestions = () => {
+    // 验证所有必填内容
+    const selectedCategory = Object.keys(questionTypes).find(cat => questionTypes[cat as QuestionCategory]?.length > 0) as QuestionCategory | undefined;
+    if (!selectedCategory) {
+      console.log('错误：请至少选择一个题目类型');
+      return;
+    }
+
+    // 打印提交的内容
+    console.log('提交的内容:', {
+      model,
+      questionTypes,
+      nodeCount,
+      hasAttachment,
+      questionCount,
+      pdfFile: pdfFile ? pdfFile.name : null
+    });
+
     setIsGenerating(true);
     
     // 模拟生成过程
     setTimeout(() => {
       const data = [];
-      const selectedCategory = Object.keys(questionTypes).find(cat => questionTypes[cat]?.length > 0);
-      const selectedType = selectedCategory ? questionTypes[selectedCategory]?.[0] : '概念理解';
+      const selectedType = questionTypes[selectedCategory]?.[0] || '概念理解';
       
       for (let i = 0; i < questionCount; i++) {
         data.push({
           id: `T${(i + 1).toString().padStart(3, '0')}`,
           type: selectedType,
-          category: selectedCategory || '基础知识',
+          category: selectedCategory,
           model,
           nodes: nodeCount,
           attachment: hasAttachment ? '有' : '无'
@@ -141,7 +193,7 @@ const QuestionGenerator = () => {
               }).map(([category, types]) => (
                 <div key={category} className="mb-3">
                   <button 
-                    onClick={() => toggleCategory(category)}
+                    onClick={() => toggleCategory(category as QuestionCategory)}
                     className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-md"
                   >
                     <div className="flex items-center">
@@ -165,10 +217,10 @@ const QuestionGenerator = () => {
                       {types.map(type => (
                         <button
                           key={type}
-                          onClick={() => toggleQuestionType(category, type)}
-                          className={`flex items-center p-2 rounded-md text-sm ${questionTypes[category]?.includes(type) ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-700'}`}
+                          onClick={() => toggleQuestionType(category as QuestionCategory, type)}
+                          className={`flex items-center p-2 rounded-md text-sm ${questionTypes[category as QuestionCategory]?.includes(type) ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-700'}`}
                         >
-                          {questionTypes[category]?.includes(type) ? (
+                          {questionTypes[category as QuestionCategory]?.includes(type) ? (
                             <Check className="mr-2" size={14} />
                           ) : (
                             <div className="w-4 h-4 border border-gray-300 rounded mr-2"></div>
